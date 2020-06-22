@@ -1,10 +1,11 @@
+# coding=utf-8
 import tensorflow as tf
 import Option
 
 LR    = Option.lr
 bitsW = Option.bitsW
 bitsA = Option.bitsA
-bitsG = Option.bitsG
+bitsG = Option.bitsG  #bitsG = 8
 bitsE = Option.bitsE
 bitsR = Option.bitsR
 L2 = Option.L2
@@ -14,7 +15,7 @@ Graph = tf.get_default_graph()
 def S(bits):
   return 2.0 ** (bits - 1)
 
-def Shift(x):
+def Shift(x):    #  2 ^ ((log2의 x)의 반올림값)
   return 2 ** tf.round(tf.log(x) / tf.log(2.0))
 
 def C(x, bits=32):
@@ -30,7 +31,7 @@ def C(x, bits=32):
 def Q(x, bits):
   if bits > 15:
     return x
-  elif bits == 1:  # BNN
+  elif bits == 1:  # BNN(banarized)
     return tf.sign(x)
   else:
     SCALE = S(bits)
@@ -55,17 +56,17 @@ def A(x):
     return x + tf.stop_gradient(y - x)  # skip derivation of Quantize, but keep Clip
 
 def G(x):
-  with tf.name_scope('QG'):
-    if bitsG > 15:
+  with tf.name_scope('QG'):  # 변수의 이름을 QG라는 그룹으로 묶어서 계층화.
+    if bitsG > 15:  # bitsG = 8
       return x
     else:
-      if x.name.lower().find('batchnorm') > -1:
+      if x.name.lower().find('batchnorm') > -1:   # x의 이름 소문자로 만들고 x에서 batchnorm이라는 문자를 찾게된다면(못찾으면 -1)
         return x  # batch norm parameters, not quantize now
 
-      xmax = tf.reduce_max(tf.abs(x))
-      x = x / Shift(xmax)
+      xmax = tf.reduce_max(tf.abs(x))  # x에 절대값 씌우고 지정된 차원을 따라 최댓값을 선택.
+      x = x / Shift(xmax)  #  x / 2^ (log(xmax-2.0)의 반올림값)
 
-      norm = Q(LR * x, bitsR)
+      norm = Q(LR * x, bitsR)  #
 
       norm_sign = tf.sign(norm)
       norm_abs = tf.abs(norm)
